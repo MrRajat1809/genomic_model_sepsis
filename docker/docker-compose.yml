@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  sepsis_multimodal:
+    build: ./docker    # <--- Change this line
+    image: sepsis_multimodal_env:latest
+    container_name: sepsis_dev_env
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace   # Now this mounts your entire project root!
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - JUPYTER_TOKEN=biotech
+    shm_size: '8gb'
