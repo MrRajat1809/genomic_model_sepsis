@@ -1,4 +1,4 @@
-# Multimodal Sepsis Prediction Framework
+# Multimodal Sepsis Prediction Framework 
 
 This repository contains the codebase for a machine learning framework designed to evaluate sepsis outcomes by integrating high-resolution clinical time-series data with peripheral blood transcriptomic profiles.
 
