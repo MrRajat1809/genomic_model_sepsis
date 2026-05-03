@@ -1,110 +1,100 @@
-# Multimodal Sepsis Prediction Framework 
+# Multimodal Sepsis Prediction Framework
 
-This repository contains the codebase for a machine learning framework designed to evaluate sepsis outcomes by integrating high-resolution clinical time-series data with peripheral blood transcriptomic profiles.
+This repository provides a pipeline for evaluating sepsis outcomes by integrating clinical time-series data with peripheral blood transcriptomic profiles. The framework compares unimodal baselines against a combined multimodal architecture to assess predictive performance.
 
 ---
 
 ## Project Overview
 
-Sepsis is a highly heterogeneous syndrome characterized by complex interactions between host immune responses and acute physiological decline. Predictive models have historically relied on a single data modality (either clinical data or genomic data), which can introduce observational blind spots.
+Sepsis is characterized by complex interactions between host immune responses and physiological decline. This project evaluates predictive models using two distinct data modalities:
 
-**Clinical-only models** excel at detecting cardiovascular and respiratory collapse (e.g., changes in mean airway pressure, minimum systolic blood pressure) but often miss baseline immune dysregulation.
+* **Clinical Data:** Electronic Health Record (EHR) data focusing on cardiovascular and respiratory indicators.
+* **Genomic Data:** Transcriptomic profiles focusing on early-stage innate immune markers.
 
-**Genomic-only models** are highly sensitive to innate immune exhaustion and neutrophil degranulation at admission but lack real-time physiological context.
-
-This project investigates whether a **multimodal early-fusion neural network** can create a comprehensive *clinical latent space* that captures the correlation between underlying immune states and acute organ failure.
+The framework utilizes a **multimodal late-fusion approach** (and experimental early-fusion deep learning) to investigate whether combining these features improves risk stratification compared to isolated models.
 
 ---
 
 ## Methodology
 
-The pipeline is structured into three primary phases:
+The pipeline consists of three phases:
 
----
+### 1. Clinical Baseline (`ICU Doctor`)
 
-### 1. Clinical Baseline
-
-We establish a purely physiological baseline using standard ICU electronic health record (EHR) data.
+A physiological baseline developed from the PhysioNet 2019 Challenge dataset (~40,000 patients).
 
 #### Data Window
 
-To strictly prevent target leakage, all clinical variables (vital signs, routine blood labs) are restricted to the **first 24 hours of ICU admission**. Patients with stays shorter than 24 hours are excluded.
+Variable-length ICU stays summarized into patient-level features.
 
 #### Feature Engineering
 
-Hourly time-series data is summarized into:
+* 104 clinical variables (vitals and labs)
+* Summary statistics:
 
-* Mean
-* Minimum
-* Maximum
+  * Mean
+  * Minimum
+  * Maximum
 
-This approach handles data sparsity while preserving clinically relevant signal dynamics.
+#### Model
 
-#### Modeling
+* **XGBoost**
 
-* Algorithm: **XGBoost**
-* Rationale: Robust performance on structured clinical data with missingness
-* Design: Sparsity-aware gradient boosting architecture
+#### Rationale
+
+Gradient boosting is utilized for its native handling of missing data (Sparsity-Aware Split Finding) and robust performance on tabular ICU data.
+
+#### Performance
+
+Achieved an ROC-AUC of **0.88** on sepsis onset prediction.
 
 ---
 
-### 2. Genomic Baseline
+### 2. Genomic Baseline (`The Geneticist`)
 
-We establish a parallel transcriptomic baseline to evaluate the predictive power of early-stage gene expression.
+A transcriptomic baseline developed from curated Gene Expression Omnibus (GEO) datasets.
 
 #### Feature Selection
 
-Rather than utilizing full genome arrays or principal component compression, the model isolates a targeted, biologically grounded **20-gene panel** associated with sepsis trajectory.
+High-dimensional input (**7,902 genes**) processed without initial dimensionality reduction to allow the model to identify non-linear interactions.
 
-**Example genes include:**
+#### Model
 
-* MMP8
-* RETN
-* IL1R2
-* SDC4
-* CEACAM8
+* **XGBoost**
 
-This targeted approach improves interpretability and reduces dimensional instability.
+#### Rationale
 
-#### Modeling
+Benchmarking against eight classifiers (including Naive Bayes, K-Nearest Neighbors, and Support Vector Machines) identified tree ensembles as the optimal architecture for this tabular biological data.
 
-* Algorithm: Tree-based classifiers
-* Optimization target: High-dimensional, low-sample-size biological datasets
-* Evaluation: Cross-validation with SHAP-based interpretability
+#### Performance
+
+Achieved an ROC-AUC of **0.76** on sepsis mortality prediction.
 
 ---
 
-### 3. Multimodal Early Fusion Architecture
+### 3. Multimodal Fusion Engine
 
-## MultimodalSepsisNet
+An inference system designed to integrate the outputs of the two specialized models.
 
-The core component of this repository is a **PyTorch-based early-fusion neural network** designed to integrate physiological and transcriptomic data into a unified predictive representation.
+#### Architecture
 
----
+Late-fusion decision logic.
 
-#### Clinical Encoder
+#### Mechanism
 
-A dense feed-forward network that compresses summarized physiological features from the first 24 hours of ICU admission.
+The system generates independent probabilities for:
 
----
+* **Sepsis Onset** (Clinical Model)
+* **Mortality Risk** (Genomic Model)
 
-#### Genomic Encoder
+#### Output
 
-A parallel neural network that processes the 20-gene transcriptomic expression array.
+A unified **ICU Dashboard** that categorizes patient risk into four tiers based on cross-modal thresholds:
 
----
-
-#### Fusion Center
-
-Both encoders project their outputs into a shared **64-dimensional latent space**.
-
-The latent vectors are:
-
-1. Concatenated
-2. Passed through a final classification head
-3. Optimized jointly via backpropagation
-
-This architecture enables gradient-driven coordination between physiological and genomic representations, allowing the model to learn cross-modal relationships between immune state and organ dysfunction.
+1. Low Risk
+2. Monitoring
+3. Warning
+4. Code Red
 
 ---
 
@@ -114,87 +104,86 @@ This architecture enables gradient-driven coordination between physiological and
 multimodal_sepsis/
 │
 ├── data/
-│   ├── raw/                 # Raw .psv and .soft.gz files (gitignored)
-│   └── processed/           # Cleaned matrices
-│       ├── clinical_24h_clean.csv
-│       └── X_matrix.csv
-│
-├── notebooks/
-│   ├── 01_genomic_baseline.ipynb
-│   ├── 02_clinical_baseline.ipynb
-│   └── 03_multimodal_fusion.ipynb
+│   ├── raw/                 # Raw .psv and GEO files (gitignored)
+│   └── processed/           # Processed tensors
+│       ├── clinical_master_raw.csv.gz
+│       └── X_master.csv.gz
 │
 ├── src/
-│   ├── data_parsers/        # GEO and time-series EHR processing scripts
-│   ├── models/              # PyTorch network definitions
-│   └── utils.py             # Metrics, evaluation, SHAP visualization
+│   ├── clinical_datasets/   # EHR parsing and XGBoost baseline scripts
+│   ├── models/              # Model benchmarking and PyTorch DNN experiments
+│   ├── 00_multimodal_inference_engine.py  # Final fusion script
+│   └── 01_shap_analysis.py  # Explainability scripts
 │
-├── Dockerfile               # Reproducible environment definition
-└── README.md
+├── outputs/
+│   ├── models/              # Saved model weights (.json and .pth)
+│   └── figures/             # SHAP and Feature Importance visualizations
+│
+└── Dockerfile               # Environment definition
 ```
 
 ---
 
 ## Technical Stack
 
-### Environment
+### Modeling
 
-* Linux (WSL2)
-* Docker
+* XGBoost
+* PyTorch
+* Scikit-learn
 
-### Data Processing
+### Data Analysis
 
 * Pandas
 * NumPy
-* Scikit-learn
-
-### Modeling
-
-* PyTorch
-* XGBoost
 
 ### Explainability
 
-* SHAP (SHapley Additive exPlanations)
+**SHAP (SHapley Additive exPlanations)** used to validate:
+
+* Clinical logic (e.g., Lactate and FiO2 importance)
+* Biological drivers (e.g., PCSK9 and RORC)
+
+### Environment
+
+Docker-containerized for reproducibility with NVIDIA GPU support (CUDA).
 
 ---
 
-## Current Status
+## Key Findings
 
-```text
-[x] Time-series clinical data parser implemented (24-hour strict window)
-[x] Transcriptomic parser implemented
-[x] Unimodal baseline models trained and evaluated using SHAP
-[x] MultimodalSepsisNet architecture compiled and validated with dummy paired data
-[ ] Final evaluation on paired multi-omics and clinical ICU datasets
-```
+1. **Algorithmic Selection**
+   Standard Deep Learning (MLP) architectures underperformed relative to XGBoost on genomic tabular data (ROC-AUC **0.65 vs 0.76**) due to high dimensionality and small sample sizes.
 
----
+2. **Clinical Features**
+   SHAP analysis confirmed that the model prioritized clinically recognized markers of septic shock, including:
 
-## Research Objective
+   * Maximum temperature
+   * High FiO2 (ventilator dependence)
+   * Elevated Lactate
 
-The primary objective of this framework is to evaluate whether integrating physiological and transcriptomic modalities through early-fusion deep learning can improve early risk stratification in sepsis compared to unimodal predictive models.
+3. **Genomic Markers**
+   The model identified **PCSK9** expression as a primary driver of mortality risk, aligning with current research regarding endotoxin clearance.
 
 ---
 
 ## Reproducibility
 
-The repository includes:
+To replicate the environment and run the inference engine:
 
-* Containerized environment definition (Docker)
-* Deterministic preprocessing pipeline
-* Modular model architecture
-* Explainability tooling via SHAP
+```bash
+# Build the container
+ docker-compose build
 
-This design supports:
+# Run the clinical parser
+ python src/clinical_datasets/01_clinical_data_parser.py
 
-* Reproducible experimentation
-* External validation
-* Clinical machine learning transparency
-* Peer-reviewed publication readiness
+# Execute the fusion engine
+ python src/00_multimodal_inference_engine.py
+```
 
 ---
 
 ## License
 
-Specify license here (e.g., MIT, Apache 2.0, or research-use license).
+MIT License
