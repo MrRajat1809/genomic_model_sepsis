@@ -3,19 +3,37 @@ torch>=2.2.0
 torchvision
 torchaudio
 pytorch-tabnet
-xgboost
+xgboost==1.7.6    # Pinned for SHAP TreeExplainer compatibility
 scikit-learn
 
-# Data Manipulation & Visualization
+# Advanced Statistics & Imputation
+statsmodels
+imbalanced-learn
+scikit-survival
+
+# Data Manipulation & Out-of-Core Processing
 pandas
 numpy
+duckdb
+openpyxl          # Required for Excel/Supplementary table I/O
+tabulate          # For cleanly formatted text tables in Jupyter
+
+# Visualization & Reporting
 matplotlib
 seaborn
+SciencePlots      # Instant Nature/Science formatting for matplotlib
+statannotations   # Easily add p-values/bars to seaborn plots
 jupyterlab
 ipywidgets
 
-# Bioinformatics & XAI
+# Bioinformatics, XAI & Manifold Learning
 scanpy
+harmonypy         # Python implementation of Harmony (integrates with scanpy)
 GEOparse
 anndata
 shap
+umap-learn
+phate
+
+# Language Bridge
+rpy2              # Allows %%R magic cells in Python notebooks
