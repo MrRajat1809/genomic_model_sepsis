@@ -1,0 +1,64 @@
+# python src/models/02_xgboost_baseline.py
+[*] INITIATING 'MOLECULAR GENETICIST' XGBOOST BASELINE...
+    -> Loading Master Tensors...
+    -> Splitting data (80% Train, 20% Test)...
+    -> Training Baseline Model...
+    -> Engaging Statistical Armor: 1,000 Bootstrap Resampling...
+
+============================================================
+[*] PUBLICATION-GRADE PERFORMANCE (Molecular Geneticist)
+    -> ROC-AUC:      0.764 (95% CI: [0.703, 0.820])
+    -> Brier Score:  0.143 (95% CI: [0.118, 0.170])
+    -> ECE:          0.078 (95% CI: [0.047, 0.112])
+============================================================
+    -> Exporting CSVs for R (ggplot2)...
+[*] Success. All data exported to plot_data/
+# python src/clinical_datasets/02_clinical_xgboost_baseline.py
+[*] INITIATING 'ICU DOCTOR' XGBOOST BASELINE...
+    -> Loading Master Clinical Matrix...
+    -> Preparing tensors...
+    -> Splitting data (80% Train, 20% Test)...
+    -> Training ICU Doctor (Learning from missing data naturally)...
+    -> Engaging Statistical Armor: 1,000 Bootstrap Resampling...
+
+============================================================
+[*] PUBLICATION-GRADE PERFORMANCE (ICU Doctor)
+    -> ROC-AUC:      0.884 (95% CI: [0.869, 0.898])
+    -> Brier Score:  0.074 (95% CI: [0.071, 0.077])
+    -> ECE:          0.119 (95% CI: [0.114, 0.124])
+============================================================
+    -> Exporting CSVs for R (ggplot2)...
+[*] Success. All data exported to plot_data/
+[*] Reconstructing Master Label Dictionary...
+[*] Loading and mapping thousands of features. This may take a minute...
+    -> [LOADED] GSE185263 (N=345, Features=7901)
+    -> [LOADED] GSE26440 (N=116, Features=7901)
+    -> [LOADED] GSE54514 (N=127, Features=7901)
+    -> [LOADED] GSE65682 (N=479, Features=7901)
+    -> [LOADED] GSE95233 (N=102, Features=7901)
+    -> [LOADED] GSE236713 (N=447, Features=7901)
+    -> [LOADED] GSE272769 (N=161, Features=7901)
+    -> [LOADED] GSE69063 (N=42, Features=7901)
+
+[*] Successfully loaded 8 cohorts into memory.
+==================================================
+[*] STARTING ARMORED LOCO VALIDATION (1,000 Bootstraps/Cohort)
+==================================================
+ -> Held Out: GSE185263  | AUC: 0.418 (95% CI: [0.347, 0.492])
+ -> Held Out: GSE26440   | AUC: 0.414 (95% CI: [0.275, 0.546])
+ -> Held Out: GSE54514   | AUC: 0.475 (95% CI: [0.361, 0.585])
+ -> Held Out: GSE65682   | AUC: 0.647 (95% CI: [0.583, 0.706])
+ -> Held Out: GSE95233   | AUC: 0.409 (95% CI: [0.278, 0.530])
+ -> Held Out: GSE236713  | AUC: 0.554 (95% CI: [0.485, 0.620])
+ -> Held Out: GSE272769  | AUC: 0.678 (95% CI: [0.596, 0.765])
+ -> Held Out: GSE69063   | AUC: 0.761 (95% CI: [0.585, 0.906])
+
+==================================================
+[*] COMPUTING META-ANALYSIS STATISTICS
+==================================================
+    -> Pooled LOCO AUC:  0.557 (95% CI: [0.526, 0.588])
+    -> Cochran's Q:      47.08 (df=7)
+    -> I^2 (Dispersion): 85.1%
+    -> [!] High Heterogeneity Detected. Domain shift is severe.
+
+[*] Export Complete! Saved to plot_data/

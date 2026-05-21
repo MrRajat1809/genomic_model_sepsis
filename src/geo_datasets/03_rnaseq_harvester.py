@@ -1,13 +1,15 @@
 """
-03_rnaseq_harvester.py
+03_rnaseq_harvester.py (Scaled for Endpoint Harmonization)
 
 A metadata parser for RNA-Seq GEO datasets.
 Utilizes GEOparse to load .soft.gz files, extracting patient characteristics 
-and clinical variables to help manually identify relevant cohorts.
-Outputs a summary text report.
+and clinical variables. Maps these variables to specific patient IDs (GSMs) 
+and exports structured CSV files to enable patient-level endpoint 
+harmonization (e.g., 28-day mortality).
 """
 
 import warnings
+import pandas as pd
 from pathlib import Path
 import GEOparse
 
@@ -17,16 +19,22 @@ warnings.filterwarnings("ignore")
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
-# Dynamically resolve paths from the script's location (src/geo_datasets/)
+# Dynamically resolve paths from the script's location
 BASE_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BASE_DIR / "data" / "raw" / "rna-seq"
-OUTPUT_FILE = DATA_DIR / "rnaseq_metadata_report.txt"
+
+# Directory for the structured CSVs (Shared with Microarray)
+CSV_OUT_DIR = BASE_DIR / "data" / "raw" / "geo_metadata"
+OUTPUT_REPORT = DATA_DIR / "rnaseq_metadata_report.txt"
+
+# Ensure output directory exists
+CSV_OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ==========================================
 # MAIN EXECUTION LOGIC
 # ==========================================
 def main():
-    print("[*] INITIATING RNA-SEQ METADATA HARVESTER...")
+    print("[*] INITIATING SCALED RNA-SEQ HARVESTER (CSV EXTRACTION)...")
 
     # Ensure the data directory exists
     if not DATA_DIR.exists():
@@ -41,31 +49,50 @@ def main():
         print(f"[!] No .soft.gz files found in {DATA_DIR}.")
         return
 
-    print(f"[*] Found {len(files)} datasets to process. Writing report to: {OUTPUT_FILE.name}")
+    print(f"[*] Found {len(files)} datasets. Generating CSVs in {CSV_OUT_DIR.name}...")
 
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as out_f:
+    with open(OUTPUT_REPORT, 'w', encoding='utf-8') as out_f:
         for file_path in files:
             gse_id = file_path.name.split('_')[0]
             print(f"[+] Deep Scanning {gse_id}...")
             
             try:
-                # Load the dataset silently using GEOparse (casting Path to str)
+                # Load the dataset silently using GEOparse
                 gse = GEOparse.get_GEO(filepath=str(file_path), silent=True)
-                meta_dict = {}
+                
+                samples_list = []
+                meta_dict = {} # For the summary report
                 
                 for gsm_name, gsm in gse.gsms.items():
+                    current_sample = {'Patient_ID': gsm_name}
                     chars = gsm.metadata.get('characteristics_ch1', [])
+                    
                     for char in chars:
                         if ':' in char:
                             key, val = char.split(':', 1)
-                            key = key.strip()
+                            key = key.strip().lower() # Lowercase for easier auditing
                             val = val.strip()
+                            
+                            current_sample[key] = val
                             
                             if key not in meta_dict:
                                 meta_dict[key] = set()
                             meta_dict[key].add(val)
+                            
+                    samples_list.append(current_sample)
+
+                # ==========================================
+                # EXPORT STRUCTURED CSV
+                # ==========================================
+                if samples_list:
+                    df = pd.DataFrame(samples_list)
+                    csv_path = CSV_OUT_DIR / f"{gse_id}_metadata.csv"
+                    df.to_csv(csv_path, index=False)
+                    print(f"    -> Saved {len(df)} patients to {csv_path.name}")
                 
-                # Write results to report
+                # ==========================================
+                # WRITE SUMMARY REPORT (Original Logic)
+                # ==========================================
                 out_f.write("========================================\n")
                 out_f.write(f"COHORT: {gse_id} | TOTAL PATIENTS: {len(gse.gsms)}\n")
                 out_f.write("========================================\n")
@@ -81,9 +108,9 @@ def main():
                 out_f.write("\n\n")
                 
             except Exception as e:
-                print(f"    [!] Failed to read {gse_id}: {e}")
+                print(f"    [!] Failed to process {gse_id}: {e}")
 
-    print(f"\n[*] RNA-SEQ HARVEST COMPLETE. Report saved to: {OUTPUT_FILE}")
+    print(f"\n[*] RNA-SEQ HARVEST COMPLETE. Metadata CSVs ready in: {CSV_OUT_DIR}")
 
 if __name__ == "__main__":
     main()

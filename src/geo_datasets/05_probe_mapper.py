@@ -4,8 +4,7 @@
 Reinforced Probe-to-Gene Translator.
 Converts dataset-specific microarray probe IDs and RNA-seq Ensembl IDs into 
 standardized HUGO Gene Symbols. Automatically detects GPL dictionaries, 
-handles complex delimiters (e.g., Affymetrix '//'), and uses the MyGene REST API 
-as a fallback for Entrez/Ensembl translation. Aggregates duplicate genes by mean expression.
+handles complex delimiters (e.g., Affymetrix '//'), and bypasses Transcript IDs.
 """
 
 import gc
@@ -19,32 +18,28 @@ import pandas as pd
 import GEOparse
 import mygene
 
-# Suppress GEOparse and Pandas warnings for cleaner terminal output
 warnings.filterwarnings("ignore")
 
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
-# Dynamically resolve paths from the script's location (src/geo_datasets/)
 BASE_DIR = Path(__file__).resolve().parents[2]
 MATRIX_DIR = BASE_DIR / "data" / "processed" / "matrices"
 SOFT_DIR_MA = BASE_DIR / "data" / "raw" / "microarray"
 OUT_DIR = BASE_DIR / "data" / "processed" / "mapped_matrices"
 
-# Ensure output directory exists
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 TARGETS = {
     'GSE236713': 'ma', 'GSE26440': 'ma', 'GSE272769': 'ma', 
-    'GSE54514': 'ma', 'GSE65682': 'ma', 'GSE69063': 'ma', 'GSE95233': 'ma',
-    'GSE185263': 'rnaseq', 'GSE63042': 'rnaseq'
+    'GSE54514': 'ma', 'GSE65682': 'ma', 'GSE95233': 'ma',
+    'GSE185263': 'rnaseq'
 }
 
 # ==========================================
 # HELPER FUNCTIONS
 # ==========================================
 def get_gpl_id(soft_path: Path) -> str:
-    """Extracts the Platform ID (GPL) from the header of a .soft file."""
     try:
         with gzip.open(soft_path, 'rt', errors='ignore') as f:
             for line in f:
@@ -55,30 +50,36 @@ def get_gpl_id(soft_path: Path) -> str:
     return None
 
 def clean_symbol(val) -> str:
-    """Cleans complex probe annotations (e.g., 'GENE // Description') into pure HUGO symbols."""
+    """Smart parser that extracts true HUGO symbols from messy Affymetrix strings."""
     if pd.isna(val) or val == '': 
         return np.nan
         
     val = str(val).strip()
     
-    # Handle Affymetrix style '//' delimiters
+    # 1. Handle Affymetrix style '//' delimiters
     if '//' in val:
         parts = [p.strip() for p in val.split('//')]
         for p in parts:
-            if p != '---' and len(p) > 1 and not p.isdigit():
+            # We want a valid string. We DO NOT want RefSeq (NM_, NR_) or Ensembl (ENST, ENSG) IDs
+            if p and p != '---' and len(p) > 1 and not p.isdigit():
+                if p.startswith(('NM_', 'NR_', 'ENST', 'ENSG', 'XM_', 'XR_')):
+                    continue # Skip the transcript IDs, look for the symbol!
                 return p.upper()
                 
-    # Handle semicolon separated lists
+    # 2. Handle semicolon separated lists
     if ';' in val:
         val = val.split(';')[0]
         
     if val == '---' or val.lower() == 'nan': 
         return np.nan
         
+    # Standard fallback
+    if val.startswith(('NM_', 'NR_', 'ENST', 'ENSG', 'XM_', 'XR_')):
+        return np.nan # If the only thing here is a transcript ID, drop it
+        
     return val.upper()
 
 def map_rnaseq_ensembl(index_list: List) -> List:
-    """Translates a list of Ensembl IDs to HUGO Symbols using the MyGene API."""
     print("      -> Ensembl IDs detected. Querying live MyGene API...")
     mg = mygene.MyGeneInfo()
     clean_ids = [str(x).split('.')[0] for x in index_list]
@@ -92,7 +93,6 @@ def map_rnaseq_ensembl(index_list: List) -> List:
     return [mapping.get(x, np.nan) for x in clean_ids]
 
 def map_entrez_to_symbol(index_list: List) -> List:
-    """Translates a list of Entrez IDs to HUGO Symbols using the MyGene API."""
     print("      -> Querying live MyGene API to translate Entrez IDs...")
     mg = mygene.MyGeneInfo()
     clean_ids = [str(x).split('.')[0] for x in index_list]
@@ -124,9 +124,6 @@ def main():
             df = pd.read_csv(matrix_path, index_col=0, compression='gzip')
             initial_rows = df.shape[0]
 
-            # -----------------------------------------------------
-            # MICROARRAY MAPPING ROUTINE
-            # -----------------------------------------------------
             if tech_type == 'ma':
                 soft_path = SOFT_DIR_MA / f"{gse_id}_family.soft.gz"
                 gpl_id = get_gpl_id(soft_path)
@@ -136,11 +133,9 @@ def main():
                     continue
                     
                 print(f"    -> Platform detected: {gpl_id}. Downloading dictionary...")
-                # GEOparse requires destdir as string
                 gpl = GEOparse.get_GEO(geo=gpl_id, destdir=str(SOFT_DIR_MA), silent=True)
                 gpl_table = gpl.table
                 
-                # Expanded search for symbol column
                 symbol_col = None
                 possible_cols = [
                     'Gene Symbol', 'Symbol', 'SYMBOL', 'GENE_SYMBOL', 
@@ -154,7 +149,6 @@ def main():
                         break
                         
                 if not symbol_col:
-                    # Fallback: Check for Entrez ID if Symbol is missing
                     entrez_col = None
                     for col in ['ENTREZ_GENE_ID', 'Entrez_Gene_ID', 'GeneID']:
                         if col in gpl_table.columns:
@@ -169,7 +163,6 @@ def main():
                         df.index = map_entrez_to_symbol(df.index)
                     else:
                         print(f"    [!] No known Gene Symbol OR Entrez column found in {gpl_id}.")
-                        print(f"        Available Dictionary Columns: {list(gpl_table.columns)}")
                         continue
                 else:
                     print(f"    -> Mapping probes using column: '{symbol_col}'...")
@@ -177,9 +170,6 @@ def main():
                     probe_dict = dict(zip(gpl_table['ID'], gpl_table['Clean_Symbol']))
                     df.index = df.index.map(probe_dict)
 
-            # -----------------------------------------------------
-            # RNA-SEQ MAPPING ROUTINE
-            # -----------------------------------------------------
             elif tech_type == 'rnaseq':
                 if any('ENSG' in str(idx) for idx in df.index[:10]):
                     df.index = map_rnaseq_ensembl(df.index)
@@ -187,9 +177,6 @@ def main():
                     print("      -> Gene Symbols detected natively.")
                     df.index = [clean_symbol(x) for x in df.index]
 
-            # -----------------------------------------------------
-            # CLEANUP & AGGREGATION
-            # -----------------------------------------------------
             print("    -> Coercing string artifacts to strict numeric format...")
             df = df.apply(pd.to_numeric, errors='coerce')
             
@@ -202,7 +189,6 @@ def main():
             
             print(f"    -> SUCCESS: Shrunk from {initial_rows} probes to {df.shape[0]} unique Genes.")
             
-            # Free RAM
             del df
             gc.collect()
 
@@ -211,7 +197,6 @@ def main():
 
     print("\n" + "="*50)
     print("[*] TRANSLATION COMPLETE. All matrices are now in HUGO Gene Symbol format.")
-    print(f"[*] Saved to: {OUT_DIR}")
     print("="*50)
 
 if __name__ == "__main__":

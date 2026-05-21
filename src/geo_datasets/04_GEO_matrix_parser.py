@@ -2,9 +2,12 @@
 04_GEO_matrix_parser.py
 
 Master matrix and label parser for the elite sepsis datasets.
-Extracts binary mortality labels using dataset-specific metadata keys.
-Separately handles Microarray (GEO table extraction) and RNA-Seq (manual supplementary files)
-matrix parsing, outputting compressed standardized matrices and a global label registry.
+MERGED VERSION:
+1. Universal Metadata Parsing: Reads .soft.gz for BOTH Microarray and RNA-Seq to get labels.
+2. Purity Filter: Surgically removes SIRS/Controls using patient-level attributes.
+3. Rosetta Stone Translation: Maps author-specific RNA-Seq matrix IDs (e.g., 'sepcol001') 
+   back to official NCBI 'GSM' IDs using metadata titles.
+4. Matrix Slicing: Enforces strict dimensional alignment.
 """
 
 import io
@@ -16,33 +19,27 @@ from pathlib import Path
 import pandas as pd
 import GEOparse
 
-# Suppress GEOparse and Pandas warnings for cleaner terminal output
 warnings.filterwarnings("ignore")
 
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
-# Dynamically resolve paths from the script's location (src/geo_datasets/)
 BASE_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BASE_DIR / "data"
 MA_DIR = DATA_DIR / "raw" / "microarray"
 SEQ_DIR = DATA_DIR / "raw" / "rna-seq"
 OUT_DIR = DATA_DIR / "processed" / "matrices"
 
-# Ensure output directory exists
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# The 9 Elite Datasets
 TARGET_DATASETS = {
-    'GSE236713': {'dir': MA_DIR, 'target_key': 'died/survived', 'type': 'ma'},
-    'GSE26440':  {'dir': MA_DIR, 'target_key': 'outcome', 'type': 'ma'},
+    'GSE236713': {'dir': MA_DIR, 'target_key': 'died/survived', 'type': 'ma', 'reject_keywords': ['sirs', 'control', 'healthy']},
+    'GSE26440':  {'dir': MA_DIR, 'target_key': 'outcome', 'type': 'ma', 'reject_keywords': ['control', 'healthy']},
     'GSE272769': {'dir': MA_DIR, 'target_key': 'mort30', 'type': 'ma'},
     'GSE54514':  {'dir': MA_DIR, 'target_key': 'disease status', 'type': 'ma'},
     'GSE65682':  {'dir': MA_DIR, 'target_key': 'mortality_event_28days', 'type': 'ma'},
-    'GSE69063':  {'dir': MA_DIR, 'target_key': 'severity', 'type': 'ma'},
     'GSE95233':  {'dir': MA_DIR, 'target_key': 'survival', 'type': 'ma'},
-    'GSE185263': {'dir': SEQ_DIR, 'target_key': 'in hospital mortality', 'type': 'rnaseq', 'file': 'GSE185263_raw_counts.csv.gz'},
-    'GSE63042':  {'dir': SEQ_DIR, 'target_key': 'sirs outcomes', 'type': 'rnaseq', 'file': 'GSE63042_capsod_seq_rel_RPM_060314.xlsx.gz'}
+    'GSE185263': {'dir': SEQ_DIR, 'target_key': 'in hospital mortality', 'type': 'rnaseq', 'file': 'GSE185263_raw_counts.csv.gz'}
 }
 
 # ==========================================
@@ -64,7 +61,7 @@ def normalize_label(val: str):
 # MAIN EXECUTION LOGIC
 # ==========================================
 def main():
-    print("[*] INITIATING MASTER MATRIX AND LABEL PARSER (WITH RNA-SEQ FIX)...")
+    print("[*] INITIATING SURGICAL MATRIX AND LABEL PARSER...")
 
     master_labels = []
 
@@ -77,14 +74,28 @@ def main():
             continue
 
         try:
-            # Load metadata only (cast Path to str for GEOparse)
-            gse = GEOparse.get_GEO(filepath=str(soft_path), silent=True)
-            valid_patients = 0
+            valid_patients = []
+            title_to_gsm = {}  # The Rosetta Stone dictionary
             target_key = config['target_key']
             
-            # 1. Extract Labels
+            # 1. UNIVERSAL LABEL EXTRACTION
+            gse = GEOparse.get_GEO(filepath=str(soft_path), silent=True)
+            
             for gsm_name, gsm in gse.gsms.items():
+                # Memorize the author's original title just in case we need to translate later
+                raw_title = str(gsm.metadata.get('title', [''])[0]).strip()
+                title_to_gsm[raw_title] = gsm_name
+                
+                # Purity Check
                 chars = gsm.metadata.get('characteristics_ch1', [])
+                source = gsm.metadata.get('source_name_ch1', [])
+                clinical_text = " ".join([str(x).lower() for x in chars + source])
+                
+                if 'reject_keywords' in config:
+                    if any(keyword in clinical_text for keyword in config['reject_keywords']):
+                        continue
+                
+                # Label Extraction
                 patient_label = None
                 for char in chars:
                     if ':' in char:
@@ -99,29 +110,28 @@ def main():
                         'Patient_ID': gsm_name, 
                         'Mortality': patient_label
                     })
-                    valid_patients += 1
-                    
-            print(f"    -> Extracted {valid_patients} valid mortality labels.")
+                    valid_patients.append(gsm_name)
             
-            # 2. Extract Expression Matrices
+            print(f"    -> Extracted {len(valid_patients)} pure mortality labels.")
+
+            # 2. MATRIX CONSTRUCTION
             out_matrix_path = OUT_DIR / f"{gse_id}_matrix.csv.gz"
-            
-            # MICROARRAY PARSING
+
+            # --- MICROARRAY ---
             if config['type'] == 'ma':
-                print("    -> Extracting Microarray Matrix...")
                 matrix_data = {}
-                for gsm_name, gsm in gse.gsms.items():
-                    if not gsm.table.empty:
-                        if 'ID_REF' in gsm.table.columns and 'VALUE' in gsm.table.columns:
-                            matrix_data[gsm_name] = gsm.table.set_index('ID_REF')['VALUE']
-                            
+                for gsm_name in valid_patients:
+                    gsm = gse.gsms[gsm_name]
+                    if not gsm.table.empty and 'ID_REF' in gsm.table.columns and 'VALUE' in gsm.table.columns:
+                        matrix_data[gsm_name] = gsm.table.set_index('ID_REF')['VALUE']
+                
                 if matrix_data:
                     df_matrix = pd.DataFrame(matrix_data)
                     df_matrix.to_csv(out_matrix_path, compression='gzip')
                     print(f"    -> Matrix saved: {df_matrix.shape[0]} rows (probes) x {df_matrix.shape[1]} columns (patients)")
                     del df_matrix
             
-            # RNA-SEQ PARSING
+            # --- RNA-SEQ ---
             elif config['type'] == 'rnaseq':
                 print("    -> Extracting RNA-Seq Matrix...")
                 file_path = config['dir'] / config['file']
@@ -133,8 +143,39 @@ def main():
                         with gzip.open(file_path, 'rb') as f:
                             df_matrix = pd.read_excel(io.BytesIO(f.read()), index_col=0)
                     
-                    df_matrix.to_csv(out_matrix_path, compression='gzip')
-                    print(f"    -> Matrix saved: {df_matrix.shape[0]} rows (genes) x {df_matrix.shape[1]} columns (patients)")
+                    # Ensure column names are clean strings
+                    df_matrix.columns = [str(c).strip() for c in df_matrix.columns]
+                    
+                    # THE ROSETTA STONE MAPPING
+                    col_mapping = {}
+                    for col in df_matrix.columns:
+                        # Case 1: The column is already a proper GSM ID
+                        for valid_gsm in valid_patients:
+                            if valid_gsm in col:
+                                col_mapping[col] = valid_gsm
+                                break
+                        
+                        # Case 2: The column is the author's local title (e.g., 'sepcol001')
+                        if col not in col_mapping:
+                            for title, gsm_id in title_to_gsm.items():
+                                if gsm_id in valid_patients and (col in title or title in col):
+                                    col_mapping[col] = gsm_id
+                                    break
+                    
+                    if not col_mapping:
+                        print("    [!] FATAL: Could not map RNA-Seq columns to valid GSM IDs.")
+                        print(f"    [!] Matrix columns: {list(df_matrix.columns[:5])}")
+                    else:
+                        # Rename columns to strict GSM IDs
+                        df_matrix = df_matrix.rename(columns=col_mapping)
+                        
+                        # Slice down to ONLY the mapped, pure patients
+                        final_cols = [c for c in df_matrix.columns if c in valid_patients]
+                        df_matrix = df_matrix[final_cols]
+                        
+                        df_matrix.to_csv(out_matrix_path, compression='gzip')
+                        print(f"    -> Matrix saved: {df_matrix.shape[0]} rows (genes) x {df_matrix.shape[1]} columns (patients)")
+                    
                     del df_matrix
                 else:
                     print(f"    [!] Missing manual file: {config['file']}")
@@ -153,7 +194,7 @@ def main():
 
     print("\n" + "="*50)
     print("[*] MASTER PARSE COMPLETE.")
-    print(f"[*] Total Labeled Sepsis Patients Secured: {len(labels_df)}")
+    print(f"[*] Total Purified Sepsis Patients Secured: {len(labels_df)}")
     print("="*50)
 
 if __name__ == "__main__":

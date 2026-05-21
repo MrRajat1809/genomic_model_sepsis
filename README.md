@@ -1,100 +1,41 @@
 # Multimodal Sepsis Prediction Framework
 
-This repository provides a pipeline for evaluating sepsis outcomes by integrating clinical time-series data with peripheral blood transcriptomic profiles. The framework compares unimodal baselines against a combined multimodal architecture to assess predictive performance.
+This repository provides a comprehensive, mathematically rigorous pipeline for evaluating sepsis outcomes by integrating clinical time-series data with peripheral blood transcriptomic profiles. The framework evaluates isolated unimodal baselines and probes the limits of cross-modal representation alignment using advanced manifold learning and optimal transport.
 
 ---
 
 ## Project Overview
 
-Sepsis is characterized by complex interactions between host immune responses and physiological decline. This project evaluates predictive models using two distinct data modalities:
+Sepsis is characterized by complex interactions between host immune responses and physiological decline. This project evaluates predictive models using two distinct, highly heterogeneous data modalities:
 
-* **Clinical Data:** Electronic Health Record (EHR) data focusing on cardiovascular and respiratory indicators.
-* **Genomic Data:** Transcriptomic profiles focusing on early-stage innate immune markers.
+* **Clinical Data (Physiology):** Electronic Health Record (EHR) data focusing on cardiovascular, respiratory, and routine lab indicators.
+* **Genomic Data (Transcriptomics):** High-dimensional microarray and RNA-seq profiles focusing on early-stage innate immune markers.
 
-The framework utilizes a **multimodal late-fusion approach** (and experimental early-fusion deep learning) to investigate whether combining these features improves risk stratification compared to isolated models.
-
----
-
-## Methodology
-
-The pipeline consists of three phases:
-
-### 1. Clinical Baseline (`ICU Doctor`)
-
-A physiological baseline developed from the PhysioNet 2019 Challenge dataset (~40,000 patients).
-
-#### Data Window
-
-Variable-length ICU stays summarized into patient-level features.
-
-#### Feature Engineering
-
-* 104 clinical variables (vitals and labs)
-* Summary statistics:
-
-  * Mean
-  * Minimum
-  * Maximum
-
-#### Model
-
-* **XGBoost**
-
-#### Rationale
-
-Gradient boosting is utilized for its native handling of missing data (Sparsity-Aware Split Finding) and robust performance on tabular ICU data.
-
-#### Performance
-
-Achieved an ROC-AUC of **0.88** on sepsis onset prediction.
+Rather than relying purely on standard late-fusion, this framework utilizes **Topological Data Analysis (TDA)** and **Optimal Transport (OT)** to investigate whether the latent geometries of these two modalities can be mathematically harmonized to form a unified predictive space.
 
 ---
 
-### 2. Genomic Baseline (`The Geneticist`)
+## Core Methodology
 
-A transcriptomic baseline developed from curated Gene Expression Omnibus (GEO) datasets.
+The analytical pipeline is divided into three distinct phases:
 
-#### Feature Selection
+### 1. Unimodal Baselines
+* **The ICU Doctor (Clinical):** An XGBoost-based physiological baseline trained on the PhysioNet 2019 Challenge dataset. It utilizes sparsity-aware gradient boosting to handle variable-length ICU stays and missing bedside data.
+* **The Molecular Geneticist (Genomic):** A high-dimensional (7,902 genes) XGBoost baseline trained on curated Gene Expression Omnibus (GEO) datasets, designed to capture complex, non-linear transcriptomic interactions.
 
-High-dimensional input (**7,902 genes**) processed without initial dimensionality reduction to allow the model to identify non-linear interactions.
+### 2. Topological Harmonization
+To evaluate the viability of Early Fusion, the pipeline maps both modalities into deep latent spaces and attempts to align them:
+* **Batch Correction:** Utilizes Domain-Adversarial Neural Networks (DANN) and **Harmony** to collapse cohort-specific technical acquisition biases (domain shift).
+* **Trajectory Mapping:** Utilizes **PHATE** to map the continuous physiological decay of clinical patients, preserving global temporal structure better than standard UMAP/t-SNE.
+* **Cross-Modal Alignment:** Employs Entropic Fused **Gromov-Wasserstein Optimal Transport (GW-OT)** to attempt a purely geometric, label-blind alignment between the clinical and genomic manifolds.
 
-#### Model
-
-* **XGBoost**
-
-#### Rationale
-
-Benchmarking against eight classifiers (including Naive Bayes, K-Nearest Neighbors, and Support Vector Machines) identified tree ensembles as the optimal architecture for this tabular biological data.
-
-#### Performance
-
-Achieved an ROC-AUC of **0.76** on sepsis mortality prediction.
-
----
-
-### 3. Multimodal Fusion Engine
-
-An inference system designed to integrate the outputs of the two specialized models.
-
-#### Architecture
-
-Late-fusion decision logic.
-
-#### Mechanism
-
-The system generates independent probabilities for:
-
-* **Sepsis Onset** (Clinical Model)
-* **Mortality Risk** (Genomic Model)
-
-#### Output
-
-A unified **ICU Dashboard** that categorizes patient risk into four tiers based on cross-modal thresholds:
-
-1. Low Risk
-2. Monitoring
-3. Warning
-4. Code Red
+### 3. Rigorous Ablation & Validation Suite
+The repository includes a comprehensive set of validation notebooks to stress-test the models:
+* **Feature Parsimony:** Testing model fragility under extreme feature compression.
+* **Probabilistic Calibration:** Evaluating overconfidence via Brier scores.
+* **Temporal Degradation:** Simulating real-time bedside prospective inference to prove early-warning capabilities.
+* **Algorithmic Fairness:** Stratifying performance across age and sex demographics.
+* **LOCO Validation:** Leave-One-Cohort-Out testing to quantify susceptibility to cross-center domain shift.
 
 ---
 
@@ -103,87 +44,89 @@ A unified **ICU Dashboard** that categorizes patient risk into four tiers based 
 ```plaintext
 multimodal_sepsis/
 │
-├── data/
-│   ├── raw/                 # Raw .psv and GEO files (gitignored)
-│   └── processed/           # Processed tensors
-│       ├── clinical_master_raw.csv.gz
-│       └── X_master.csv.gz
+├── data/                            # Local data mounts (gitignored)
+│   ├── raw/                         # Raw PhysioNet .psv and GEO Soft files
+│   └── processed/                   
+│       ├── clinical_tensors/        # Parsed ICU tabular matrices
+│       ├── ml_tensors/              # Standardized transcriptomic matrices
+│       └── mapped_matrices/         # Individual cohort matrices for LOCO
 │
-├── src/
-│   ├── clinical_datasets/   # EHR parsing and XGBoost baseline scripts
-│   ├── models/              # Model benchmarking and PyTorch DNN experiments
-│   ├── 00_multimodal_inference_engine.py  # Final fusion script
-│   └── 01_shap_analysis.py  # Explainability scripts
+├── src/                             # Core parsers and inference logic
+│   ├── clinical_datasets/           # EHR parsing scripts
+│   ├── models/                      # DNN architectures and benchmarking
+│   └── 00_multimodal_inference_engine.py 
 │
-├── outputs/
-│   ├── models/              # Saved model weights (.json and .pth)
-│   └── figures/             # SHAP and Feature Importance visualizations
+├── manifolds/                       # Topological Alignment Pipeline
+│   └── 01_genomic_clinical_manifold_dann.ipynb
 │
-└── Dockerfile               # Environment definition
-```
+├── notebooks/                       # Clinical Validation Suite
+│   ├── 02_feature_parsimony.ipynb
+│   ├── 03_reliability_and_calibration.ipynb
+│   ├── 04_temporal_degradation.ipynb
+│   ├── 05_algorithmic_fairness.ipynb
+│   ├── 06_loco_external_validation.ipynb
+│   └── 07_full_model_loco_validation.ipynb
+│
+├── outputs/                         # Generated artifacts
+│   ├── models/                      # Trained XGBoost (.json) & PyTorch (.pth) weights
+│   └── figures/                     # UMAPs, PHATE trajectories, ROC curves
+│
+├── docker-compose.yml               # Container orchestration
+└── Dockerfile                       # Environment definition
 
----
+Technical Stack
+Machine Learning: XGBoost, PyTorch, Scikit-learn
 
-## Technical Stack
+Manifold Learning & Topology: UMAP, PHATE (phate), Harmony (harmonypy)
 
-### Modeling
+Optimal Transport: Python Optimal Transport (POT / ot)
 
-* XGBoost
-* PyTorch
-* Scikit-learn
+Data Processing & Viz: Pandas, NumPy, Matplotlib, Seaborn
 
-### Data Analysis
+Infrastructure: NVIDIA CUDA-enabled Docker containerization.
 
-* Pandas
-* NumPy
+Reproducibility Guide
+To fully replicate the environment and execute the experimental pipeline from scratch, follow these steps:
 
-### Explainability
+Step 1: Environment Initialization
+The entire pipeline is containerized to prevent dependency conflicts. Ensure Docker and NVIDIA Container Toolkit are installed.
 
-**SHAP (SHapley Additive exPlanations)** used to validate:
+# Build and launch the container
+docker-compose up -d --build
 
-* Clinical logic (e.g., Lactate and FiO2 importance)
-* Biological drivers (e.g., PCSK9 and RORC)
+# Access the interactive workspace
+docker exec -it sepsis_multimodal_container /bin/bash
 
-### Environment
+Step 2: Data Preparation
+(Note: You must download the raw PhysioNet 2019 dataset and GEO cohorts into data/raw/ prior to this step).
 
-Docker-containerized for reproducibility with NVIDIA GPU support (CUDA).
+Bash
+# Execute the clinical EHR parser to generate tensors
+python src/clinical_datasets/01_clinical_data_parser.py
+Step 3: Run Topological Alignment
+Navigate to the manifolds/ directory and execute the primary alignment notebook to generate the latent geometries and optimal transport projections.
 
----
+Run manifolds/01_genomic_clinical_manifold_dann.ipynb
 
-## Key Findings
+Step 4: Execute the Validation Suite
+Navigate to the notebooks/ directory. These notebooks evaluate the models trained during the data parsing phase. They must be executed to generate the final manuscript figures:
 
-1. **Algorithmic Selection**
-   Standard Deep Learning (MLP) architectures underperformed relative to XGBoost on genomic tabular data (ROC-AUC **0.65 vs 0.76**) due to high dimensionality and small sample sizes.
+02_feature_parsimony.ipynb
 
-2. **Clinical Features**
-   SHAP analysis confirmed that the model prioritized clinically recognized markers of septic shock, including:
+03_reliability_and_calibration.ipynb
 
-   * Maximum temperature
-   * High FiO2 (ventilator dependence)
-   * Elevated Lactate
+04_temporal_degradation.ipynb
 
-3. **Genomic Markers**
-   The model identified **PCSK9** expression as a primary driver of mortality risk, aligning with current research regarding endotoxin clearance.
+05_algorithmic_fairness.ipynb
 
----
+06_loco_external_validation.ipynb
 
-## Reproducibility
+07_full_model_loco_validation.ipynb
 
-To replicate the environment and run the inference engine:
+Step 5: Final Inference
+To test the multimodal late-fusion decision logic on a simulated patient:
 
-```bash
-# Build the container
- docker-compose build
-
-# Run the clinical parser
- python src/clinical_datasets/01_clinical_data_parser.py
-
-# Execute the fusion engine
- python src/00_multimodal_inference_engine.py
-```
-
----
-
-## License
-
-MIT License
+Bash
+python src/00_multimodal_inference_engine.py
+License
+MIT License. See LICENSE for more information.
