@@ -1,3 +1,6 @@
+OLD DO NOT READ NEEDS TO BE UPDATED
+
+
 # Multimodal Sepsis Prediction Framework
 
 This repository provides a comprehensive, mathematically rigorous pipeline for evaluating sepsis outcomes by integrating clinical time-series data with peripheral blood transcriptomic profiles. The framework evaluates isolated unimodal baselines and probes the limits of cross-modal representation alignment using advanced manifold learning and optimal transport.
