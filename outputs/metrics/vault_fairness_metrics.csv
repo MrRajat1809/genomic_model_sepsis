@@ -1,0 +1,6 @@
+Category,Subgroup,AUROC,N
+Baseline,Overall Cohort,0.6639269406392695,479
+Biological Sex,Male,0.6645761245674741,272
+Biological Sex,Female,0.6627059141236835,207
+Age Bracket,< 60 Years,0.6809437386569873,183
+Age Bracket,>= 60 Years,0.6570574162679427,296
