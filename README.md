@@ -62,10 +62,9 @@ The analysis identified a 36-gene biomarker panel from an initial background of 
 
 Performance was similar across demographic subgroups (male/female AUROC ~0.66; <60 years AUROC 0.68, ≥60 years AUROC 0.66). Model calibration on external validation showed a Brier score of 0.208.
 
-![Figure 3: DEG Heatmap](outputs/figures/Fig3A.pdf)
-![Figure 3: Pearson's Correlation Matrix](outputs/figures/Fig3C.pdf)
-![Figure 4: Functional Enrichment GO](outputs/figures/Fig4A.pdf)
-![Figure 4: Functional Enrichment KEGG](outputs/figures/Fig4B.pdf)
+![Figure 3: DEG Visualization](Figures/Fig3.jgp)
+![Figure 4: Functional Enrichment](Figures/Fig4.jpg)
+![Figure 7: Model Evaluation](Figures/Fig7.jpg)
 
 ## Technologies Used
 
