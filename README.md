@@ -6,7 +6,7 @@ A machine learning framework that identifies and validates a 36-gene transcripto
 
 This project develops a prognostic transcriptomic signature for sepsis mortality risk stratification using publicly available GEO datasets. The study focuses specifically on mortality prediction within confirmed sepsis patients, excluding healthy controls and non-infectious inflammatory samples to emphasize outcome-related transcriptomic variation.
 
-**Key approach:** Multi-cohort integration with strict external validation to assess generalizability across independent datasets.
+**Key approach:** Multi-cohort integration with external validation to assess generalizability across independent datasets.
 
 ## Repository Structure
 
@@ -103,7 +103,7 @@ If this work is used in research, please cite the corresponding manuscript submi
 
 ## Data Availability
 
-Derived transcriptomic matrices and analysis-ready tensors are available on Zenodo as "SepsisTensor v1: A Harmonized Multi-Cohort Transcriptomic Resource for Mortality Prediction." Raw GEO files are available through their original GEO accession numbers.
+Derived transcriptomic matrices and analysis-ready tensors are available on Zenodo as "SepsisTensor v1: A Harmonized Multi-Cohort Transcriptomic Resource for Mortality Prediction." https://doi.org/10.5281/zenodo.20326923 Raw GEO files are available through their original GEO accession numbers.
 
 ---
 
