@@ -32,23 +32,17 @@ genomic_model_sepsis/
 │   │   └── 06_vault_validation.py             # External validation pipeline
 │   ├── 04_statistics/                # Statistical validation
 │   │   ├── 01_batch_effect_anova.py           # Batch effect assessment
-│   │   ├── 02_mortality_association.py        # Gene-outcome associations
-│   │   ├── 03_cox_hazard.py                   # Cox proportional hazards
+│   │   ├── 02_distribution_analysis.py        # Gene-outcome associations
+│   │   ├── 03_model_calibration.py            # Brier-score assessment
 │   │   ├── 04_algorithmic_fairness.py         # Demographic performance
 │   │   └── 05_loco_meta_analysis.py           # Leave-one-cohort-out analysis
-│   └── 05_visualization/             # Figure generation
-│       ├── 01a_pca_batch_effect.py           # Batch correction diagnostic
-│       ├── 02_deg_volcano.py                  # Differential expression plots
-│       ├── 03_heatmap_elite_genes.py         # Gene signature heatmap
-│       ├── 05_feature_importance_shap.py     # SHAP summary plots
-│       └── 06a_plot_combined_roc.py          # ROC curves
+│   └── 05_visualization/             # Figure generation scripts
 ├── outputs/
 │   ├── models/                       # Trained models
 │   ├── features/                     # Gene panels & importance scores
 │   ├── metrics/                      # Performance evaluations
 │   └── figures/                      # Manuscript figures
-├── Dockerfile
-├── requirements.txt
+├── docker                            # Scripts for environment setup
 └── README.md
 ```
 
@@ -62,45 +56,6 @@ The workflow encompasses:
 - **Feature Selection (Panel B):** Candidate genes are identified through differential expression analysis with cross-cohort consistency filtering and functional enrichment. Recursive Feature Elimination with Cross-Validation (RFECV) reduces the candidate set to a final biomarker panel.
 
 - **Model Training and Validation (Panel C):** The XGBoost classifier is trained with stratified cross-validation on training data, followed by external validation on the held-out cohort. Statistical tests assess model calibration, demographic fairness, and generalizability via leave-one-cohort-out analysis.
-
-## Installation
-
-```bash
-# Clone repository
-git clone https://github.com/MrRajat1809/genomic_model_sepsis.git
-cd genomic_model_sepsis
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-## Running the Pipeline
-
-```bash
-# Execute individual analysis components:
-cd src/03_models
-python 01_algorithm_benchmarking.py
-python 03_rfecv_optimization.py
-python 06_vault_validation.py
-
-cd ../04_statistics
-python 04_algorithmic_fairness.py
-python 05_loco_meta_analysis.py
-
-cd ../05_visualization
-python 06a_plot_combined_roc.py
-```
-
-## Using Docker
-
-```bash
-docker build -t sepsis-ml .
-docker run -v $(pwd)/outputs:/app/outputs sepsis-ml
-```
 
 ## Key Results
 
@@ -116,25 +71,6 @@ Performance was similar across demographic subgroups (male/female AUROC ~0.66; <
 - **Interpretation:** SHAP (TreeExplainer)
 - **Visualization:** matplotlib, seaborn
 - **Statistical Testing:** scipy.stats
-
-## Output Files
-
-```
-outputs/
-├── models/
-│   ├── final_xgboost_model.pkl
-│   └── cv_fold_models/
-├── features/
-│   ├── optimal_biomarker_panel.csv          # 36 selected genes
-│   └── gene_shap_importance_consensus.csv
-├── metrics/
-│   ├── cv_fold_predictions.csv
-│   ├── vault_predictions.csv
-│   ├── vault_roc_bounds.csv
-│   └── loco_meta_analysis.csv
-└── figures/
-    └── (Publication figures)
-```
 
 ## Study Design Details
 
