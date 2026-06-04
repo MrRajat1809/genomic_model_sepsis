@@ -20,7 +20,6 @@ genomic_model_sepsis/
 │   │   ├── matrices/                 # Master clinical labels
 │   │   ├── deg_tensors/              # Candidate gene subsets
 │   │   └── ml_tensors/               # Train/Atlas/Vault tensors for ML pipeline
-│   └── README_DATA.md
 ├── src/
 │   ├── 01_geo_datasets/              # GEO data retrieval & preprocessing
 │   ├── 02_geo_datasets/              # Gene mapping & harmonization
