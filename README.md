@@ -54,7 +54,8 @@ genomic_model_sepsis/
 
 ## Workflow
 
-See Figure 1 in the manuscript for the complete analysis pipeline. The workflow encompasses:
+![Figure 1: Complete Analysis Pipeline](Figures/Fig1.png)
+The workflow encompasses:
 
 - **Data Harmonization (Panel A):** Seven public GEO datasets are integrated with probe-to-gene mapping, gene intersection identification, Z-score normalization, and ComBat batch correction. GSE65682 is held out as an external validation vault.
 
