@@ -1,4 +1,4 @@
-# Machine Learning Discovers a Robust 36-Gene Transcriptomic Signature for Sepsis Mortality
+# 36-Gene Blood Transcriptomic Signature for Early Sepsis Triage and Risk Stratification
 
 A machine learning framework that identifies and validates a 36-gene transcriptomic biomarker panel for predicting sepsis patient mortality. This work integrates multi-cohort genomic data, batch correction, feature selection, and external validation.
 
